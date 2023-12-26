@@ -1,6 +1,9 @@
 import './App.css'
 import PropTypes from 'prop-types'
-import {useState, useEffect} from 'react'
+import {useState, useEffect, useReducer} from 'react'
+
+const SET_STORIES = 'SET_STORIES';
+const REMOVE_STORY = 'REMOVE_STORY';
 
 const useStorageState = (key, initialState) => {
   const [value, setValue] = useState(
@@ -38,16 +41,40 @@ const getAsyncStories = () =>
     setTimeout(
       () => resolve({data: {stories: initialStories}}),
       2000
-    ))
+    ));
+
+const storiesReducer = (state, action) => {
+  switch(action.type) {
+    case SET_STORIES:
+      return action.payload
+    case REMOVE_STORY:
+      return state.filter(
+        (story) => story.objectID !== action.payload.objectID
+      )
+    default:
+      throw new Error()
+  }
+}
 
 function App() {
   const [searchTerm, setSearchTerm] = useStorageState('search', 'React');
-  const [stories, setStories] = useState([])
+  const [stories, dispatchStories] = useReducer(
+    storiesReducer,
+    []
+  )
+  const [isLoading, setIsLoading] = useState(false)
+  const [isError, setIsError] = useState(false);
   
   useEffect(() => {
     getAsyncStories().then(result => {
-      setStories(result.data.stories)
+      dispatchStories({
+        type: SET_STORIES,
+        payload: result.data.stories
+      })
+      setIsLoading(false);
     })
+    .catch(() => setIsError(true))
+    setIsLoading(true)
   },[])
 
   const handleSearch = (event) => {
@@ -55,10 +82,10 @@ function App() {
   }
 
   const handleRemoveStory = (item) => {
-    const newStories = stories.filter(
-      (story) => item.objectID !== story.objectID
-    )
-    setStories(newStories)
+    dispatchStories({
+      type: REMOVE_STORY,
+      payload: item,
+    })
   }
 
   const searchedStories = stories.filter((item) => item.title.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -76,7 +103,8 @@ function App() {
 
       <hr />
       {/* this is comment */}
-      
+      {isError && <p>Something went wrong...</p>}
+      {isLoading && <div>Loading...</div>}
       <List list={searchedStories} onRemoveItem={handleRemoveStory} />
     </div>
   )
